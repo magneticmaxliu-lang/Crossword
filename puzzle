@@ -1,0 +1,188 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mini Crossword</title>
+  <style>
+    body { font-family: system-ui, Arial; max-width: 900px; margin: 24px auto; padding: 0 16px; }
+    .wrap { display: grid; grid-template-columns: 320px 1fr; gap: 18px; }
+    .grid { display: grid; grid-template-columns: repeat(12, 38px); gap: 4px; }
+    .cell {
+      width: 38px; height: 38px; border: 1px solid #999; border-radius: 6px;
+      display:flex; align-items:center; justify-content:center;
+      font-weight: 700; text-transform: uppercase;
+      background: #fff;
+    }
+    .cell input {
+      width: 100%; height: 100%;
+      border: 0; outline: none;
+      text-align: center; font-size: 18px; font-weight: 800;
+      background: transparent; text-transform: uppercase;
+    }
+    .block { background: #111; border-color: #111; }
+    .active { outline: 3px solid #000; }
+    button { padding: 10px 12px; border-radius: 12px; border: 1px solid #ccc; background:#fff; cursor:pointer; }
+    button:hover { background:#f5f5f5; }
+    .clue { margin: 0 0 8px; }
+    .small { color:#555; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Crossword: Will You Be My Valentine?</h1>
+
+  <div class="wrap">
+    <div>
+      <h3>Clues (Across)</h3>
+      <div class="clue">1. Future tense helper verb (4)</div>
+      <div class="clue">2. The person I'm asking (3)</div>
+      <div class="clue">3. To exist / happen (2)</div>
+      <div class="clue">4. Belonging to me (2)</div>
+      <div class="clue">5. Feb 14 theme word (9)</div>
+
+      <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button id="check">Check</button>
+        <button id="reveal">Reveal</button>
+        <button id="clear">Clear</button>
+      </div>
+      <p class="small">Tip: click a square, then type.</p>
+      <p id="msg" style="font-weight:800;"></p>
+    </div>
+
+    <div class="grid" id="grid"></div>
+  </div>
+
+<script>
+  // 12x12 grid. '#' = black block, '.' = fillable.
+  // This layout places the 5 words on different rows.
+  const layout = [
+    "............",
+    "####....####", // WILL at col 4
+    "####...#####", // YOU at col 4
+    "####..######", // BE at col 4
+    "####..######", // MY at col 4
+    "###.........", // VALENTINE at col 3
+    "############",
+    "############",
+    "############",
+    "############",
+    "############",
+    "############",
+  ];
+
+  // Entries: start row, start col, direction, answer
+  // direction: "A" across (we’ll add "D" later if you want)
+  const entries = [
+    { num: 1, row: 1, col: 4, dir: "A", answer: "WILL" },
+    { num: 2, row: 2, col: 4, dir: "A", answer: "YOU" },
+    { num: 3, row: 3, col: 4, dir: "A", answer: "BE" },
+    { num: 4, row: 4, col: 4, dir: "A", answer: "MY" },
+    { num: 5, row: 5, col: 3, dir: "A", answer: "VALENTINE" },
+  ];
+
+  const H = layout.length;
+  const W = layout[0].length;
+
+  const gridEl = document.getElementById("grid");
+  const msgEl = document.getElementById("msg");
+
+  // Build grid UI
+  const inputs = []; // 2D
+  for (let r = 0; r < H; r++) {
+    inputs[r] = [];
+    for (let c = 0; c < W; c++) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      if (layout[r][c] === "#") {
+        cell.classList.add("block");
+        gridEl.appendChild(cell);
+        inputs[r][c] = null;
+        continue;
+      }
+      const inp = document.createElement("input");
+      inp.maxLength = 1;
+
+      inp.addEventListener("focus", () => setActive(r,c));
+      inp.addEventListener("input", () => {
+        inp.value = inp.value.toUpperCase().replace(/[^A-Z]/g,"");
+        moveNext(r,c);
+      });
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Backspace" && inp.value === "") movePrev(r,c);
+      });
+
+      cell.appendChild(inp);
+      gridEl.appendChild(cell);
+      inputs[r][c] = inp;
+    }
+  }
+
+  let active = {r: 0, c: 0};
+  function setActive(r,c){
+    // remove old outline
+    const allCells = gridEl.querySelectorAll(".cell");
+    allCells.forEach(el => el.classList.remove("active"));
+    // set new
+    active = {r,c};
+    const idx = r*W + c;
+    allCells[idx].classList.add("active");
+  }
+
+  function moveNext(r,c){
+    // simple: move right to next open cell
+    for (let cc = c+1; cc < W; cc++){
+      if (inputs[r][cc]) { inputs[r][cc].focus(); return; }
+    }
+  }
+  function movePrev(r,c){
+    for (let cc = c-1; cc >= 0; cc--){
+      if (inputs[r][cc]) { inputs[r][cc].focus(); return; }
+    }
+  }
+
+  function clearAll(){
+    for (let r=0;r<H;r++){
+      for (let c=0;c<W;c++){
+        if (inputs[r][c]) inputs[r][c].value="";
+      }
+    }
+    msgEl.textContent = "";
+  }
+
+  function revealAll(){
+    for (const e of entries){
+      for (let i=0;i<e.answer.length;i++){
+        const rr = e.row;
+        const cc = e.col + i;
+        if (inputs[rr][cc]) inputs[rr][cc].value = e.answer[i];
+      }
+    }
+    msgEl.textContent = "Revealed ✅";
+  }
+
+  function check(){
+    let ok = true;
+    for (const e of entries){
+      for (let i=0;i<e.answer.length;i++){
+        const rr = e.row;
+        const cc = e.col + i;
+        const v = inputs[rr][cc]?.value ?? "";
+        if (v !== e.answer[i]) ok = false;
+      }
+    }
+    msgEl.textContent = ok ? "✅ All correct!" : "❌ Some letters are wrong or missing.";
+  }
+
+  document.getElementById("check").addEventListener("click", check);
+  document.getElementById("reveal").addEventListener("click", revealAll);
+  document.getElementById("clear").addEventListener("click", clearAll);
+
+  // focus first fill cell
+  for (let r=0;r<H;r++){
+    for (let c=0;c<W;c++){
+      if (inputs[r][c]) { inputs[r][c].focus(); setActive(r,c); r=H; break; }
+    }
+  }
+</script>
+</body>
+</html>
